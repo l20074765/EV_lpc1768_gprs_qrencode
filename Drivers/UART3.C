@@ -14,7 +14,7 @@
 ********************************************************************************************************/
 #include "..\config.h"
 
-#define	UART3_BPS			9600
+#define	UART3_BPS			115200
 #define	UART3BUFFERLEN		256
 
 volatile unsigned char Uart3RevBuff[UART3BUFFERLEN];

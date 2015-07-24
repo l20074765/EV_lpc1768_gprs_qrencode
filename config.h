@@ -50,6 +50,7 @@ extern "C" {
 #include ".\Drivers\RTC.H"
 #include ".\Drivers\i2c.h"
 #include ".\Drivers\timer.h"
+#include ".\Drivers\gprs.h"
 #include ".\Drivers\AT45DB161D.H"
 /*********************************************************************************************************
   外设驱动高层件头文件-串口2任务

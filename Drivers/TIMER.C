@@ -94,7 +94,10 @@ void TIMER0_IRQHandler (void)
 
 	if(Timer.zhihui_recv_timeout) //add by yoc zhihui 2013.12.16
 		Timer.zhihui_recv_timeout--;
-
+	if(Timer.gprs_uart_timeout)
+		Timer.gprs_uart_timeout--;
+	if(Timer.gprs_recv_over)
+		Timer.gprs_recv_over--;
 
 	
 	

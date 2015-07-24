@@ -23,49 +23,7 @@
 
 
 
-/*********************************************************************************************************
-** Function name:     	XorCheck
-** Descriptions:	    累加校验和
-** input parameters:    无
-** output parameters:   无
-** Returned value:      无
-*********************************************************************************************************/
-unsigned char XorCheck(unsigned char *pstr,unsigned short len)
-{
-	unsigned char xor_check = 0;
-	unsigned short i;
-	for(i=0;i<len;i++) 
-	{
-       	xor_check = xor_check^pstr[i];
-   	}
-	return xor_check;
-}
-/*********************************************************************************************************
-** Function name:     	CrcCheck
-** Descriptions:	    CRC校验和
-** input parameters:    msg需要检验的数据;len数据长度
-** output parameters:   无
-** Returned value:      CRC检验结果
-*********************************************************************************************************/
-unsigned short CrcCheck(unsigned char *msg, unsigned short len) 
-{
-    unsigned short i, j;
-    unsigned short crc = 0;
-    unsigned short current = 0;
-    for(i=0;i<len;i++) 
-    {
-        current = msg[i] << 8;
-        for(j=0;j<8;j++) 
-        {
-            if((short)(crc^current)<0)
-                crc = (crc<<1)^0x1021;
-            else 
-                crc <<= 1; 
-            current <<= 1; 
-        }
-    }
-    return crc;
-}
+
 
 
 

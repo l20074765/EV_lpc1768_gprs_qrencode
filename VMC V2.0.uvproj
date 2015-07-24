@@ -43,13 +43,13 @@
             <InvalidFlash>1</InvalidFlash>
           </TargetStatus>
           <OutputDirectory>.\Hex\</OutputDirectory>
-          <OutputName>VMC_V2_10_2015_qrencode_V1_0</OutputName>
+          <OutputName>EV_gprs_V1.0</OutputName>
           <CreateExecutable>1</CreateExecutable>
           <CreateLib>0</CreateLib>
           <CreateHexFile>1</CreateHexFile>
-          <DebugInformation>1</DebugInformation>
-          <BrowseInformation>1</BrowseInformation>
-          <ListingPath>.\Lst\</ListingPath>
+          <DebugInformation>0</DebugInformation>
+          <BrowseInformation>0</BrowseInformation>
+          <ListingPath>.\Hex\</ListingPath>
           <HexFormatSelection>1</HexFormatSelection>
           <Merge32K>0</Merge32K>
           <CreateBatchFile>0</CreateBatchFile>
@@ -474,6 +474,16 @@
               <FileName>GPRS_UART.c</FileName>
               <FileType>1</FileType>
               <FilePath>.\Drivers\GPRS_UART.c</FilePath>
+            </File>
+            <File>
+              <FileName>board.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\Drivers\board.c</FilePath>
+            </File>
+            <File>
+              <FileName>gprs.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\Drivers\gprs.c</FilePath>
             </File>
           </Files>
         </Group>

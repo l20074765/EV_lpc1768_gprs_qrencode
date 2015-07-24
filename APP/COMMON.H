@@ -84,6 +84,9 @@ typedef struct
 	uint8_t		pcm_handle_timeout;	//售货机处理PC请求超时 add by yoc newAisle
 	
 	uint8_t		getTempTimer;				  //读取温度定时器
+	unsigned short gprs_recv_over;
+	unsigned int gprs_uart_timeout;
+
 } TIMER;
 extern TIMER Timer;
 
