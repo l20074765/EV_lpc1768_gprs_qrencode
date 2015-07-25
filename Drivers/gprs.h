@@ -22,13 +22,19 @@
 #define GPRS_TIMEOUT			0
 #define GPRS_OK					1
 #define GPRS_ERROR				2
-#define GPRS_OTHER_ERR			0xFF	
+#define GPRS_CME_ERROR			3
+#define GPRS_OTHER				0xFF	
 
+typedef struct {
+	uint8 type;
 
+}GPRS_ST;
 
 
 
 uint8 GPRS_sendAT(int8 *cmd,uint8 len,uint32 timeout);
+uint8 GPRS_AT_CSQ(void);
+void GPRS_task(void);
 #endif
 
 

@@ -77,10 +77,7 @@ void MainTask(void *pvData)
 		QR_draw(50,"http://www.easivend.com.cn");
 		OSTimeDly(1000);
 		while(1){
-			GPRS_sendAT("AT",sizeof("AT"),1000);
-			msleep(1000);
-			GPRS_sendAT("ATTTT>Lsdfsd",sizeof("ATTTT"),1000);
-			msleep(1000);
+			GPRS_task();
 		}
 		
 	}
