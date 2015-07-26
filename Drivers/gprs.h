@@ -31,8 +31,16 @@ typedef struct {
 }GPRS_ST;
 
 
+typedef struct{
+	char ip[20];
+	char path[64];
+	uint8 len;
+	uint8 ch;
+	uint32 port;
+}GPRS_IP;
 
-uint8 GPRS_sendAT(int8 *cmd,uint8 len,uint32 timeout);
+
+uint8 GPRS_sendAT(char *str,...);
 uint8 GPRS_AT_CSQ(void);
 void GPRS_task(void);
 #endif

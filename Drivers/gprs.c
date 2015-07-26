@@ -44,17 +44,19 @@ static uint16 gprs_len = 0;
 
 GPRS_ST st_gprs;
 
+#define GPRS_IP_SIZE		8
+GPRS_IP	st_ip[8];
 
 uint8 GPRS_send(char *str,...)
 {
 	va_list arg_ptr;
-	uint32 i,len;
+	uint16 len;
 	memset(gprs_buf,0,sizeof(gprs_buf));
 	va_start(arg_ptr, str);
 	len = vsprintf(gprs_buf,(const char *)str,arg_ptr);
 	va_end(arg_ptr);
 	UART_clear();
-	UART_putStr(gprs_buf,len);
+	UART_putStr((const uint8 *)gprs_buf,len);
 	print_gprs("GPRS_Send[%d]:%s\r\n",len,gprs_buf);
 	return 1;
 }
@@ -86,16 +88,37 @@ uint16 GPRS_readAll(uint8 *buf,uint32 timeout,uint16 subTimeout)
 }
 
 
+char *GPRS_strstr(const char *src,const char *str,...)
+{
+	char buf[64] = {0};
+	uint16 len;	
+	va_list arg_ptr;
+
+	memset(buf,0,sizeof(buf));
+	va_start(arg_ptr, str);
+	len = vsprintf(buf,(const char *)str,arg_ptr);
+	va_end(arg_ptr);
+
+    return strstr(src,buf);
+
+}
+
 //指定收入字符串 1正确 0不正确
-uint8 GPRS_recvByStr(char *str,uint32 timeout,uint32 subTimeout){
+uint8 GPRS_recvByStr(uint32 timeout,uint32 subTimeout,char *str,...){
 
 	char buf[64] = {0};
-	uint8 res;
-	uint16 len;
-	
-	len = GPRS_readAll(buf,timeout,subTimeout);
+	uint16 len;	
+	va_list arg_ptr;
+
+	memset(buf,0,sizeof(buf));
+	va_start(arg_ptr, str);
+	len = vsprintf(buf,(const char *)str,arg_ptr);
+	va_end(arg_ptr);
+
+
+	len = GPRS_readAll((uint8 *)gprs_buf,timeout,subTimeout);
 	if(len > 0){
-		if(strstr(buf,str) == NULL){
+		if(strstr(gprs_buf,buf) == NULL){
 			return 0;
 		}
 		else{
@@ -109,43 +132,48 @@ uint8 GPRS_recvByStr(char *str,uint32 timeout,uint32 subTimeout){
 
 
 
-
-//0超时 1成功 2错误
-uint8 GPRS_recv(char *buf,uint16 *len,uint32 timeout)
+// 0 超时 1成功 2错误
+uint8 GPRS_sendAT(char *str,...)
 {
-	*len = GPRS_readAll(buf,timeout,500);
-	if(*len == 0){
+
+	va_list arg_ptr;
+	uint32 len;
+	memset(gprs_buf,0,sizeof(gprs_buf));
+	va_start(arg_ptr, str);
+	len = vsprintf(gprs_buf,(const char *)str,arg_ptr);
+	va_end(arg_ptr);
+	
+	strcat(gprs_buf,"\r");
+
+	UART_clear();
+	UART_putStr((const uint8 *)gprs_buf,len + 1);
+	print_gprs("GPRS_Send[%d]:%s\r\n",len + 1,gprs_buf);
+	memset(gprs_buf,0,sizeof(gprs_buf));
+
+
+	len = GPRS_readAll((uint8 *)gprs_buf,2000,500);
+	if(len == 0){
 		print_gprs("GPRS:GPRS_TIMEOUT!!!!\r\n");
 		return GPRS_TIMEOUT;
 	}
 
-	if(strstr(buf,"\r\nOK\r\n") != NULL){
+	if(strstr(gprs_buf,"\r\nOK\r\n") != NULL){
 		print_gprs("GPRS:OK!!!!\r\n");
 		return GPRS_OK;
 	}
 	
-    if(strstr(buf,"\r\nERROR\r\n") != NULL){
+    if(strstr(gprs_buf,"\r\nERROR\r\n") != NULL){
 		print_gprs("GPRS:ERROR!!!!\r\n");
 		return GPRS_ERROR;
 	}
 
-	if(strstr(buf,"+CME ERROR:") != NULL){
+	if(strstr(gprs_buf,"+CME ERROR:") != NULL){
 		print_gprs("GPRS:+CME ERROR:!!!!\r\n");
 		return GPRS_CME_ERROR;
 	}
 
 	return GPRS_OTHER; 
 
-}
-
-// 0 超时 1成功 2错误
-uint8 GPRS_sendAT(int8 *cmd,uint8 len,uint32 timeout)
-{
-	uint8 res;
-	GPRS_send(cmd);
-	memset(gprs_buf,0,sizeof(gprs_buf));
-	res = GPRS_recv(gprs_buf,&gprs_len,timeout);
-	return res;
 }
 
 
@@ -161,7 +189,7 @@ uint8 GPRS_AT_CSQ(void)
 {
 	uint8 res,rssi;
 	char *p,*q,buf[10] = {0};
-	res = GPRS_sendAT("AT+CSQ\r",sizeof("AT+CSQ\r"),1000);
+	res = GPRS_sendAT("AT+CSQ");
 	if(res == GPRS_OK){
 		p = strstr((char *)gprs_buf,"+CSQ:");
 		if(p == NULL){
@@ -199,7 +227,7 @@ uint8 GPRS_AT_CREG(void)
 {
 	uint8 res;
 	char *p;
-	res = GPRS_sendAT("AT+CREG?\r",sizeof("AT+CREG?\r"),1000);
+	res = GPRS_sendAT("AT+CREG?");
    	if(res == GPRS_OK){
 		 p = strstr((char *)gprs_buf,",");
 		 if(p == NULL){
@@ -231,26 +259,26 @@ uint8 GPRS_AT_CREG(void)
 uint8 GPRS_createProfile(void)
 {
 	uint8 res;
-	res = GPRS_sendAT("AT^SICS=0,conType,GPRS0\r",sizeof("AT^SICS=0,conType,GPRS0\r"),1000);
+	res = GPRS_sendAT("AT^SICS=0,conType,GPRS0");
    	if(res != GPRS_OK){
 	    print_gprs("GPRS:'AT^SICS=0,conType,GPRS0' ERR!!!\r\n");
 		return 0;
 	}
 
-	res = GPRS_sendAT("AT^SICS=0,apn,cmnet\r",sizeof("AT^SICS=0,apn,cmnet\r"),1000);
+	res = GPRS_sendAT("AT^SICS=0,apn,cmnet");
    	if(res != GPRS_OK){
 	    print_gprs("GPRS:'AT^SICS=0,apn,cmnet' ERR!!!\r\n");
 		return 0;
 	}
 
 
-	res = GPRS_sendAT("AT^SICS=0,user,yoc\r",sizeof("AT^SICS=0,user,yoc\r"),1000);
+	res = GPRS_sendAT("AT^SICS=0,user,yoc");
    	if(res != GPRS_OK){
 	    print_gprs("GPRS:'AT^SICS=0,user,yoc' ERR!!!\r\n");
 		return 0;
 	}
 
-	res = GPRS_sendAT("AT^SICS=0,passwd,123\r",sizeof("AT^SICS=0,passwd,123\r"),1000);
+	res = GPRS_sendAT("AT^SICS=0,passwd,123");
    	if(res != GPRS_OK){
 	    print_gprs("GPRS:'AT^SICS=0,passwd,123' ERR!!!\r\n");
 		return 0;
@@ -262,30 +290,30 @@ uint8 GPRS_createProfile(void)
 
 
 /*********************************************************************************************************
-** Function name:       GPRS_createProfileServer
+** Function name:       GPRS_AT_SISS
 ** Descriptions:        创建Profile服务  此处建立TCP 套接字
 ** input parameters:    无
 ** output parameters:   无
 ** Returned value:      0失败  1成功
 *********************************************************************************************************/
-uint8 GPRS_createProfileServer(void)
+uint8 GPRS_AT_SISS(GPRS_IP *ip)
 {
 	uint8 res;
-	res = GPRS_sendAT("AT^SISS=1,srvType,socket\r",sizeof("AT^SISS=1,srvType,socket\r"),1000);
+	res = GPRS_sendAT("AT^SISS=%d,srvType,socket",ip->ch);
    	if(res != GPRS_OK){
-	    print_gprs("GPRS:'AT^SISS=1,srvType,socket' ERR!!!\r\n");
+	    print_gprs("GPRS:'AT^SISS,srvType,socket' ERR!!!\r\n");
 		return 0;
 	}
 
-	res = GPRS_sendAT("AT^SISS=1,conId,0\r",sizeof("AT^SISS=1,conId,0\r"),1000);
+	res = GPRS_sendAT("AT^SISS=%d,conId,0",ip->ch);
    	if(res != GPRS_OK){
 	    print_gprs("GPRS:'AT^SISS=1,conId,0' ERR!!!\r\n");
 		return 0;
 	}
 
-	res = GPRS_sendAT("AT^SISS=1,address,\"socktcp://117.27.89.53:10001\"\r",sizeof("AT^SISS=1,address,\"socktcp://117.27.89.53:10001\"\r"),1000);
+	res = GPRS_sendAT("AT^SISS=%d,address,\"socktcp://%s:%d\"",ip->ch,ip->ip,ip->port);
    	if(res != GPRS_OK){
-	    print_gprs("GPRS:'AT^SISS=1,address,\"socktcp://117.27.89.53:10001\"' ERR!!!\r\n");
+	    print_gprs("AT^SISS=%d,address,\"socktcp://%s:%d\" ERR\r\n",ip->ch,ip->ip,ip->port);
 		return 0;
 	}
 
@@ -302,13 +330,9 @@ uint8 GPRS_createProfileServer(void)
 *********************************************************************************************************/
 uint8 GPRS_AT_SISO(uint8 ch)
 {
-	uint8 res;
-	uint16 ln;
-	char buf[20] = {0};
 	char *p;
-	ln = sprintf(buf,"AT^SISO=%d\r",ch);
-	GPRS_send(buf);
-	gprs_len = GPRS_readAll(gprs_buf,5000,1000);
+	GPRS_send("AT^SISO=%d\r",ch);
+	gprs_len = GPRS_readAll((uint8 *)gprs_buf,5000,1000);
    	if(gprs_len == 0){
 	    print_gprs("GPRS:'AT^SISO=1' ERR!!!\r\n");
 		return 0;
@@ -325,6 +349,180 @@ uint8 GPRS_AT_SISO(uint8 ch)
 	}
 }
 
+
+uint8 GPRS_AT_SISC(uint8 ch)
+{
+	uint8 res;
+	res = GPRS_sendAT("AT^SISC=%d",ch);
+	if(res == GPRS_OK){return 1;}
+	else {return 0;}
+}
+
+
+
+//"http://117.27.89.53:10001/yv/api/vmcCheckin"
+uint8 GPRS_getIP(const char *url,GPRS_IP *ip)
+{
+	char buf[12] = {0};
+	char *p,*q;
+	if(url == NULL || ip == NULL){return 0;}
+	p = strstr(url,"http://");
+	if(p == NULL){return 0;}
+	p = p + 7;
+	q = strstr(p,":");
+	if(q == NULL){return 0;}
+	memset(ip->ip,0,sizeof(ip->ip));
+	strncpy(ip->ip,p,q - p);
+	p = q + 1;
+	q = strstr(p,"/");
+	if(q == NULL){return 0;}
+	memset(buf,0,sizeof(buf));
+	strncpy(buf,p,q - p);
+	ip->port = atoi(buf);
+	strcpy(ip->path,q);
+	print_gprs("ip=%s,port=%d,path=%s\r\n",ip->ip,ip->port,ip->path);
+	return 1;
+}
+
+
+GPRS_IP *GPRS_check(GPRS_IP *ip){
+	uint8 i;
+	GPRS_IP *ipTr;
+	if(ip == NULL){return NULL;}
+	for(i = 0;i < GPRS_IP_SIZE;i++){
+		ipTr = &st_ip[i];
+		if(ipTr->port == 0){
+			ipTr->port = ip->port;
+			ipTr->ch = i;
+			strcpy(ipTr->ip,ip->ip);
+			strcpy(ipTr->path,ip->path);
+			return ipTr;
+		}
+		else{
+		 	if(strcmp(ipTr->ip,ip->ip) == 0){
+				return ipTr;
+			}
+		}	
+	}
+	return NULL;		
+}
+
+
+uint8 GPRS_httpPostPack(const char *data,GPRS_IP *ip,char *httpData)
+{
+	uint16 temp;
+	char buf[10] = {0};
+	if(data == NULL || httpData == NULL ){return 0;}
+	strcat(httpData,"POST ");
+	strcat(httpData,ip->path);
+	strcat(httpData," HTTP/1.1\r\n");
+	strcat(httpData,"Accept:*/*\r\n");
+	strcat(httpData,"Accept-Language: zh-cn\r\n");
+	strcat(httpData,"Host: ");
+	strcat(httpData,ip->ip);
+	strcat(httpData,"\r\n");
+	strcat(httpData,"Content-Type: application/x-www-form-urlencoded\r\n");
+
+	memset(buf,0,sizeof(buf));
+	sprintf(buf,"Content-Length: %d\r\n",strlen(data));
+	strcat(httpData,buf);
+	strcat(httpData,"\r\n");
+	strcat(httpData,data);
+	return 1;
+}
+
+
+//0超时 1成功  0xFF 错误
+uint8 GPRS_createTcp(GPRS_IP *ip)
+{
+	uint8 res;
+	char buf[64] = {0};
+	char *p;
+	res = GPRS_sendAT("AT^SICS?");
+	if(res != GPRS_OK){
+		return (res == GPRS_TIMEOUT) ? 0 : 0xFF;
+	}
+
+	p = strstr(gprs_buf,"^SICS: 0,\"user\",");
+	if(p == NULL){ //没建立
+		 res = GPRS_createProfile();
+		 if(res != 1){return 0xFF;}
+	}
+
+	res = GPRS_sendAT("AT^SISS?");
+	if(res != GPRS_OK){
+		return (res == GPRS_TIMEOUT) ? 0 : 0xFF;
+	}
+
+	memset(buf,0,sizeof(buf));
+	sprintf(buf,"^SISS: %d,\"address\"",ip->ch);
+	p = strstr(gprs_buf,buf);
+	if(p == NULL){ //没建立
+		 res = GPRS_AT_SISS(ip);
+		 if(res != 1){return 0xFF;}
+	}
+
+
+	return 1;
+
+
+}
+
+// data   "http://117.27.89.53:10001/yv/api/vmcCheckin"
+uint8 GPRS_httpPost(const char *data,const char *url)
+{
+	uint8 res;
+	uint16 rlen,len;
+	//提取ip
+	GPRS_IP ip,*ipTr;
+	res = GPRS_getIP(url,&ip);
+	if(res != 1){return 0;}
+
+	
+	ipTr = GPRS_check(&ip);
+	if(ipTr == NULL){return 0;}
+		
+	memset(gprs_buf,0,sizeof(gprs_buf));
+	res = GPRS_httpPostPack(data,ipTr,gprs_buf);
+	if(res != 1){return 0;}
+	print_gprs("GPRS_httpPost3\r\n");
+	len = strlen(data);
+	print_gprs("GPRS_httpPost4\r\n");
+   	GPRS_AT_SISC(ipTr->ch);
+	res = GPRS_createTcp(ipTr);
+	if(res != 1){return 0;}
+
+	res = GPRS_AT_SISO(ipTr->ch);
+	if(res != 1){return 0;}
+
+
+	GPRS_send("AT^SISW=%d,%d\r",ipTr->ch,len);
+	res = GPRS_recvByStr(5000,1000,"^SISW: %d,%d,%d",ipTr->ch,len,len);
+	if(res != 1){return 0;}
+
+	
+	
+	UART_clear();
+	UART_putStr((const uint8 *)gprs_buf,strlen(gprs_buf));
+	print_gprs("GPRS_Send[%d]:%s\r\n",strlen(gprs_buf),gprs_buf);
+	
+	rlen = GPRS_readAll((uint8 *)gprs_buf,10000,5000);
+	if(rlen == 0){return 0;}
+	else{
+		if(GPRS_strstr((const char *)gprs_buf,"^SISW: %d,1",ipTr->ch) == NULL){
+			return 0;
+		}
+		if(GPRS_strstr((const char *)gprs_buf,"^SISR: %d, 1",ipTr->ch) == NULL){
+			return 0;
+		}
+	}
+	
+	res = GPRS_send("AT^SISR=%d,1500\r",ipTr->ch);
+	rlen = GPRS_readAll((uint8 *)gprs_buf,20000,5000);
+			
+	return 1;
+}
+
 /*********************************************************************************************************
 ** Function name:       GPRS_tcpWrite
 ** Descriptions:        TCP套接字发送数据
@@ -336,48 +534,59 @@ uint8 GPRS_tcpWrite(const char *data,uint16 len,uint8 ch)
 {
 	uint8 buf[64] = {0},ln,res;
 	uint16 rlen = 0;
-	memset(buf,0,sizeof(buf));
-	ln = sprintf((char *)buf,"AT^SISW=%d,%d\r",ch,len);
-	GPRS_send((char *)buf);
-	memset(buf,0,sizeof(buf));
-	ln = sprintf((char *)buf,"^SISW: %d,%d,%d",ch,len,len);
-	res = GPRS_recvByStr(buf,5000,1000);
+	GPRS_send("AT^SISW=%d,%d\r",ch,len);
+	res = GPRS_recvByStr(5000,1000,"^SISW: %d,%d,%d",ch,len,len);
 	if(res != 1){return 0;}
-	
+
+
+
 	res = GPRS_send((char *)data);
-	rlen = GPRS_readAll(gprs_buf,10000,8000);
+	rlen = GPRS_readAll((uint8 *)gprs_buf,10000,8000);
 	if(rlen == 0){return 0;}
 	else{
 		memset(buf,0,sizeof(buf));
 		ln = sprintf((char *)buf,"^SISW: %d,1",ch);
-		if(strstr(gprs_buf,buf) == NULL){
+		if(strstr((const char *)gprs_buf,(const char *)buf) == NULL){
 			return 0;
 		}
 
 		memset(buf,0,sizeof(buf));
 		ln = sprintf((char *)buf,"^SISR: %d, 1",ch);
-		if(strstr(gprs_buf,buf) == NULL){
+		if(strstr((const char *)gprs_buf,(const char *)buf) == NULL){
 			return 0;
 		}
 	}
 
-	memset(buf,0,sizeof(buf));
-	ln = sprintf((char *)buf,"AT^SISR=%d,1500\r",ch);
-	res = GPRS_send((char *)buf);
-	rlen = GPRS_readAll(gprs_buf,10000,5000);
+
+
+	res = GPRS_send("AT^SISR=%d,1500\r",ch);
+	rlen = GPRS_readAll((uint8 *)gprs_buf,10000,5000);
 
 	return 1;
 }
+
+
 
 
 void GPRS_task(void)
 {
 	uint8 res;
 	char buf[256] = {0};
-	static flag = 0;
-	if(flag == 0){flag = 1;GPRS_createProfile();GPRS_createProfileServer();}
+	GPRS_IP ip;
+	ip.port = 10001;
+	ip.ch = 1;
+	strcpy(ip.ip,"117.27.89.53");
+	res = GPRS_httpPost("param={'vmc_no':'ev0001','vmc_auth_code':'0001'}",
+					"http://117.27.89.53:10001/yv/api/vmcCheckin");
+	print_gprs("GPRS_http:res=%d\r\n",res);
+	msleep(5000);
+#if 0
+	//GPRS_getIP("http://117.27.89.53:10001/yv/api/vmcCheckin",&ip);
+
+	GPRS_createTcp(&ip);
 	
-	
+	GPRS_AT_SISC(1);
+	msleep(500);
 	GPRS_AT_SISO(1);
 	msleep(500);
 	memset(buf,0,sizeof(buf));
@@ -394,6 +603,7 @@ void GPRS_task(void)
 	print_gprs("GPRS:TCPSendLen=%d\r\n",strlen(buf));
 	GPRS_tcpWrite(buf,strlen(buf),1);	 
 	msleep(5000);
+#endif
 }
 
 
