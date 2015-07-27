@@ -410,6 +410,16 @@
               <FileType>1</FileType>
               <FilePath>.\API\qrencodeApi.c</FilePath>
             </File>
+            <File>
+              <FileName>gprsApi.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\API\gprsApi.c</FilePath>
+            </File>
+            <File>
+              <FileName>alipayApi.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\API\alipayApi.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
@@ -636,6 +646,19 @@
               <FilePath>.\qrencode\split.c</FilePath>
             </File>
           </Files>
+        </Group>
+        <Group>
+          <GroupName>json</GroupName>
+          <Files>
+            <File>
+              <FileName>cJSON.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\json\cJSON.c</FilePath>
+            </File>
+          </Files>
+        </Group>
+        <Group>
+          <GroupName>cstl</GroupName>
         </Group>
       </Groups>
     </Target>

@@ -14,11 +14,14 @@ void GPRS_task(void)
 	ip.port = 10001;
 	ip.ch = 1;
 	strcpy(ip.ip,"117.27.89.53");
-	res = GPRS_httpPost("param={'vmc_no':'ev0001','vmc_auth_code':'0001'}",
-					"http://117.27.89.53:10001/yv/api/vmcCheckin");
-	if(res == 0)
-		print_gpi("GPRS_http:FAIL GPRS_http:FAIL GPRS_http:FAIL GPRS_http:FAILres=%d\r\n\r\n",res);
+	
+
+	ALI_trade(NULL);
+
 	msleep(5000);
+
+	
+	
 #if 0
 	//GPRS_getIP("http://117.27.89.53:10001/yv/api/vmcCheckin",&ip);
 

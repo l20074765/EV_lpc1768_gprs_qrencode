@@ -371,15 +371,25 @@ uint8 GPRS_AT_SISC(uint8 ch)
 
 
 
-//"http://117.27.89.53:10001/yv/api/vmcCheckin"
+//"http://117.27.89.53:10001/yv/api/vmcCheckin"  https://mapi.alipay.com/gateway.do?
 uint8 GPRS_getIP(const char *url,GPRS_IP *ip)
 {
 	char buf[12] = {0};
 	char *p,*q;
 	if(url == NULL || ip == NULL){return 0;}
 	p = strstr(url,"http://");
-	if(p == NULL){return 0;}
-	p = p + 7;
+	q = strstr(url,"https://");
+	if(p == NULL && q == NULL){
+		print_gprs("GPRS_getIP:p == NULL && q == NULL\r\n");
+		return 0;
+	}
+	if(p != NULL){
+		p = p + 7;	
+	}
+	else{
+		p = q + 8;
+	}
+	
 	q = strstr(p,":");
 	if(q == NULL){return 0;}
 	memset(ip->ip,0,sizeof(ip->ip));
@@ -425,7 +435,7 @@ uint8 GPRS_httpPostPack(const char *data,GPRS_IP *ip,char *httpData)
 	if(data == NULL || httpData == NULL || ip == NULL){return 0;}
 	strcat(httpData,"POST ");
 	strcat(httpData,ip->path);
-	strcat(httpData," HTTP/1.1\r\n");
+	strcat(httpData," HTTP/1.0\r\n");
 	strcat(httpData,"Accept:*/*\r\n");
 	strcat(httpData,"Accept-Language: zh-cn\r\n");
 	strcat(httpData,"Host: ");
