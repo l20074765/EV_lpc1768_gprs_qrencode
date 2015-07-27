@@ -38,8 +38,9 @@ static FUN_UartPutStr UART_putStr = Uart3PutStr;
 static FUN_UartBuffIsNotEmpty UART_isNotEmpty = Uart3BuffIsNotEmpty;
 static FUN_UartGetCh UART_getchar = Uart3GetCh;
 
-#define GPRS_BUF_SIZE	1024
+#define GPRS_BUF_SIZE	2048
 static char gprs_buf[GPRS_BUF_SIZE] = {0};
+static char send_buf[GPRS_BUF_SIZE] = {0};
 static uint16 gprs_len = 0;
 
 GPRS_ST st_gprs;
@@ -62,27 +63,36 @@ uint8 GPRS_send(char *str,...)
 }
 
 //返回 读取数据长度
-uint16 GPRS_readAll(uint8 *buf,uint32 timeout,uint16 subTimeout)
+uint16 GPRS_readAll(char *buf,uint32 timeout,uint16 subTimeout)
 {
-	uint16 index = 0;
+	uint16 index = 0,t;
+	char ch;
 	Timer.gprs_uart_timeout = (timeout > 10) ? timeout / 10 : 1;
+	t = (subTimeout > 50) ? subTimeout / 10 : 5;
+	index = 0;
+	if(buf == NULL){
+		print_gprs("GPRS_readAll:buf == NULL\r\n");
+		return 0;
+	}
+	OSIntEnter();
 	print_gprs("GPRS_Recv:");
 	while(Timer.gprs_uart_timeout){
 		if(UART_isNotEmpty()){
-			 buf[index++] =  UART_getchar();
-			 print_gprs("%c",buf[index - 1]);
-			 Timer.gprs_recv_over = (subTimeout > 50) ? subTimeout / 10 : 5;	 
-		}
-		else{
-			msleep(10);
+			 ch = UART_getchar();
+			 buf[index++] = ch;
+			 print_gprs("%c",ch);
+			 Timer.gprs_recv_over = t;	 
 		}
 
 		if(index > 0 && Timer.gprs_recv_over == 0){ //接收完成
 			print_gprs("\r\n");
+			print_gprs("GPRS_Read[%d]\r\n\r\n",index);
+			OSIntExit();
 			return index;
 		}
 	}
 	print_gprs("\r\n");
+	OSIntExit();
 	return index;
 
 }
@@ -90,13 +100,11 @@ uint16 GPRS_readAll(uint8 *buf,uint32 timeout,uint16 subTimeout)
 
 char *GPRS_strstr(const char *src,const char *str,...)
 {
-	char buf[64] = {0};
-	uint16 len;	
+	char buf[128] = {0};
 	va_list arg_ptr;
-
 	memset(buf,0,sizeof(buf));
 	va_start(arg_ptr, str);
-	len = vsprintf(buf,(const char *)str,arg_ptr);
+	vsprintf(buf,(const char *)str,arg_ptr);
 	va_end(arg_ptr);
 
     return strstr(src,buf);
@@ -116,7 +124,7 @@ uint8 GPRS_recvByStr(uint32 timeout,uint32 subTimeout,char *str,...){
 	va_end(arg_ptr);
 
 
-	len = GPRS_readAll((uint8 *)gprs_buf,timeout,subTimeout);
+	len = GPRS_readAll(gprs_buf,timeout,subTimeout);
 	if(len > 0){
 		if(strstr(gprs_buf,buf) == NULL){
 			return 0;
@@ -135,40 +143,36 @@ uint8 GPRS_recvByStr(uint32 timeout,uint32 subTimeout,char *str,...){
 // 0 超时 1成功 2错误
 uint8 GPRS_sendAT(char *str,...)
 {
-
-	va_list arg_ptr;
-	uint32 len;
+	uint16 len;
+	va_list arg_ptr;	
 	memset(gprs_buf,0,sizeof(gprs_buf));
 	va_start(arg_ptr, str);
 	len = vsprintf(gprs_buf,(const char *)str,arg_ptr);
 	va_end(arg_ptr);
-	
 	strcat(gprs_buf,"\r");
 
+	print_gprs("GPRS_Send[%d]:%s\r\n",len + 1,gprs_buf);
 	UART_clear();
 	UART_putStr((const uint8 *)gprs_buf,len + 1);
-	print_gprs("GPRS_Send[%d]:%s\r\n",len + 1,gprs_buf);
 	memset(gprs_buf,0,sizeof(gprs_buf));
-
-
-	len = GPRS_readAll((uint8 *)gprs_buf,2000,500);
+	len = GPRS_readAll(gprs_buf,2000,500);
 	if(len == 0){
 		print_gprs("GPRS:GPRS_TIMEOUT!!!!\r\n");
 		return GPRS_TIMEOUT;
 	}
 
 	if(strstr(gprs_buf,"\r\nOK\r\n") != NULL){
-		print_gprs("GPRS:OK!!!!\r\n");
+		print_gprs("GPRS:OK\r\n");
 		return GPRS_OK;
 	}
 	
-    if(strstr(gprs_buf,"\r\nERROR\r\n") != NULL){
+    if(strstr(gprs_buf,"\r\nERROR\r\n\r\n") != NULL){
 		print_gprs("GPRS:ERROR!!!!\r\n");
 		return GPRS_ERROR;
 	}
 
 	if(strstr(gprs_buf,"+CME ERROR:") != NULL){
-		print_gprs("GPRS:+CME ERROR:!!!!\r\n");
+		print_gprs("GPRS:+CME ERROR\r\n\r\n");
 		return GPRS_CME_ERROR;
 	}
 
@@ -332,7 +336,7 @@ uint8 GPRS_AT_SISO(uint8 ch)
 {
 	char *p;
 	GPRS_send("AT^SISO=%d\r",ch);
-	gprs_len = GPRS_readAll((uint8 *)gprs_buf,5000,1000);
+	gprs_len = GPRS_readAll(gprs_buf,5000,1000);
    	if(gprs_len == 0){
 	    print_gprs("GPRS:'AT^SISO=1' ERR!!!\r\n");
 		return 0;
@@ -410,9 +414,8 @@ GPRS_IP *GPRS_check(GPRS_IP *ip){
 
 uint8 GPRS_httpPostPack(const char *data,GPRS_IP *ip,char *httpData)
 {
-	uint16 temp;
-	char buf[10] = {0};
-	if(data == NULL || httpData == NULL ){return 0;}
+	char buf[64] = {0};
+	if(data == NULL || httpData == NULL || ip == NULL){return 0;}
 	strcat(httpData,"POST ");
 	strcat(httpData,ip->path);
 	strcat(httpData," HTTP/1.1\r\n");
@@ -428,6 +431,7 @@ uint8 GPRS_httpPostPack(const char *data,GPRS_IP *ip,char *httpData)
 	strcat(httpData,buf);
 	strcat(httpData,"\r\n");
 	strcat(httpData,data);
+	//print_gprs("GPRS_httpPostPack[%d]:\r\n%s\r\n\r\n",httpData,strlen(httpData) - strlen(data));
 	return 1;
 }
 
@@ -436,30 +440,45 @@ uint8 GPRS_httpPostPack(const char *data,GPRS_IP *ip,char *httpData)
 uint8 GPRS_createTcp(GPRS_IP *ip)
 {
 	uint8 res;
-	char buf[64] = {0};
 	char *p;
 	res = GPRS_sendAT("AT^SICS?");
 	if(res != GPRS_OK){
+		print_gprs("GPRS_createTcp:AT^SICS? not OK! res = %d\r\n",res);
 		return (res == GPRS_TIMEOUT) ? 0 : 0xFF;
 	}
 
 	p = strstr(gprs_buf,"^SICS: 0,\"user\",");
 	if(p == NULL){ //没建立
 		 res = GPRS_createProfile();
-		 if(res != 1){return 0xFF;}
+		 if(res != 1){
+		 	print_gprs("GPRS_createProfile Fall\r\n",res);
+			return 0xFF;
+		}
 	}
 
-	res = GPRS_sendAT("AT^SISS?");
-	if(res != GPRS_OK){
-		return (res == GPRS_TIMEOUT) ? 0 : 0xFF;
+	GPRS_send("AT^SISS?\r");
+	memset(gprs_buf,0,sizeof(gprs_buf));
+	res = GPRS_readAll(gprs_buf,4000,2000);
+	if(res == 0){
+		return 0;
 	}
+	if(strstr(gprs_buf,"\r\nOK\r\n") == NULL) {
+		print_gprs("AT^SISS? == NULL");
+		//return 0xFF;	
+	}
+	//res = GPRS_sendAT("AT^SISS?");
+	//if(res != GPRS_OK){
+	//	print_gprs("GPRS_createTcp:AT^SISS? not OK! res = %d\r\n",res);
+	//	return (res == GPRS_TIMEOUT) ? 0 : 0xFF;
+	//}
 
-	memset(buf,0,sizeof(buf));
-	sprintf(buf,"^SISS: %d,\"address\"",ip->ch);
-	p = strstr(gprs_buf,buf);
+	p = GPRS_strstr(gprs_buf,"^SISS: %d,\"address\"",ip->ch);
 	if(p == NULL){ //没建立
 		 res = GPRS_AT_SISS(ip);
-		 if(res != 1){return 0xFF;}
+		 if(res != 1){
+		 	print_gprs("GPRS_AT_SISS:fail\r\n");
+		 	return 0xFF;
+		}
 	}
 
 
@@ -473,52 +492,71 @@ uint8 GPRS_httpPost(const char *data,const char *url)
 {
 	uint8 res;
 	uint16 rlen,len;
-	//提取ip
 	GPRS_IP ip,*ipTr;
 	res = GPRS_getIP(url,&ip);
-	if(res != 1){return 0;}
+	if(res != 1){
+		print_gprs("GPRS_getIP:fail!!!\r\n");
+		return 0;
+	}
 
 	
 	ipTr = GPRS_check(&ip);
-	if(ipTr == NULL){return 0;}
+	if(ipTr == NULL){
+		print_gprs("GPRS_check:fail!!!\r\n");
+		return 0;	
+	}
 		
-	memset(gprs_buf,0,sizeof(gprs_buf));
-	res = GPRS_httpPostPack(data,ipTr,gprs_buf);
-	if(res != 1){return 0;}
-	print_gprs("GPRS_httpPost3\r\n");
-	len = strlen(data);
-	print_gprs("GPRS_httpPost4\r\n");
+	memset(send_buf,0,sizeof(send_buf));
+	res = GPRS_httpPostPack(data,ipTr,send_buf);
+	if(res != 1){
+		print_gprs("GPRS_httpPostPack:fail!!!\r\n");	
+		return 0;
+	}
+	len = strlen(send_buf);
+
    	GPRS_AT_SISC(ipTr->ch);
 	res = GPRS_createTcp(ipTr);
-	if(res != 1){return 0;}
-
+	if(res != 1){
+		print_gprs("GPRS_createTcp:fail!!!\r\n");
+		return 0;
+	}
 	res = GPRS_AT_SISO(ipTr->ch);
-	if(res != 1){return 0;}
+	if(res != 1){
+		print_gprs("GPRS_AT_SISO:fail!!!\r\n");
+		return 0;
+	}
 
 
 	GPRS_send("AT^SISW=%d,%d\r",ipTr->ch,len);
 	res = GPRS_recvByStr(5000,1000,"^SISW: %d,%d,%d",ipTr->ch,len,len);
-	if(res != 1){return 0;}
-
-	
-	
+	if(res != 1){
+		print_gprs("AT^SISW:fail!!!\r\n");
+		return 0;
+	}
+   	
+	//发送tcp数据
 	UART_clear();
-	UART_putStr((const uint8 *)gprs_buf,strlen(gprs_buf));
-	print_gprs("GPRS_Send[%d]:%s\r\n",strlen(gprs_buf),gprs_buf);
-	
-	rlen = GPRS_readAll((uint8 *)gprs_buf,10000,5000);
-	if(rlen == 0){return 0;}
+	UART_putStr((const uint8 *)send_buf,len);
+	print_gprs("Http_Send[%d]:%s\r\n",len,send_buf);
+	rlen = GPRS_readAll(gprs_buf,10000,5000);
+	if(rlen == 0){
+		print_gprs("Http_recv:timeout!!!\r\n");
+		return 0;
+	}
 	else{
 		if(GPRS_strstr((const char *)gprs_buf,"^SISW: %d,1",ipTr->ch) == NULL){
+			print_gprs("Http_recv:^SISW:  timeout!!!\r\n");
 			return 0;
 		}
 		if(GPRS_strstr((const char *)gprs_buf,"^SISR: %d, 1",ipTr->ch) == NULL){
+			print_gprs("Http_recv:^SISR: timeout!!!\r\n");
 			return 0;
 		}
 	}
 	
 	res = GPRS_send("AT^SISR=%d,1500\r",ipTr->ch);
-	rlen = GPRS_readAll((uint8 *)gprs_buf,20000,5000);
+	memset(gprs_buf,0,sizeof(gprs_buf));
+	rlen = GPRS_readAll(gprs_buf,20000,5000);
 			
 	return 1;
 }
@@ -532,7 +570,7 @@ uint8 GPRS_httpPost(const char *data,const char *url)
 *********************************************************************************************************/
 uint8 GPRS_tcpWrite(const char *data,uint16 len,uint8 ch)
 {
-	uint8 buf[64] = {0},ln,res;
+	uint8 buf[64] = {0},res;
 	uint16 rlen = 0;
 	GPRS_send("AT^SISW=%d,%d\r",ch,len);
 	res = GPRS_recvByStr(5000,1000,"^SISW: %d,%d,%d",ch,len,len);
@@ -541,17 +579,17 @@ uint8 GPRS_tcpWrite(const char *data,uint16 len,uint8 ch)
 
 
 	res = GPRS_send((char *)data);
-	rlen = GPRS_readAll((uint8 *)gprs_buf,10000,8000);
+	rlen = GPRS_readAll(gprs_buf,10000,8000);
 	if(rlen == 0){return 0;}
 	else{
 		memset(buf,0,sizeof(buf));
-		ln = sprintf((char *)buf,"^SISW: %d,1",ch);
+		sprintf((char *)buf,"^SISW: %d,1",ch);
 		if(strstr((const char *)gprs_buf,(const char *)buf) == NULL){
 			return 0;
 		}
 
 		memset(buf,0,sizeof(buf));
-		ln = sprintf((char *)buf,"^SISR: %d, 1",ch);
+		sprintf((char *)buf,"^SISR: %d, 1",ch);
 		if(strstr((const char *)gprs_buf,(const char *)buf) == NULL){
 			return 0;
 		}
@@ -560,7 +598,7 @@ uint8 GPRS_tcpWrite(const char *data,uint16 len,uint8 ch)
 
 
 	res = GPRS_send("AT^SISR=%d,1500\r",ch);
-	rlen = GPRS_readAll((uint8 *)gprs_buf,10000,5000);
+	rlen = GPRS_readAll(gprs_buf,10000,5000);
 
 	return 1;
 }
@@ -571,14 +609,14 @@ uint8 GPRS_tcpWrite(const char *data,uint16 len,uint8 ch)
 void GPRS_task(void)
 {
 	uint8 res;
-	char buf[256] = {0};
 	GPRS_IP ip;
 	ip.port = 10001;
 	ip.ch = 1;
 	strcpy(ip.ip,"117.27.89.53");
 	res = GPRS_httpPost("param={'vmc_no':'ev0001','vmc_auth_code':'0001'}",
 					"http://117.27.89.53:10001/yv/api/vmcCheckin");
-	print_gprs("GPRS_http:res=%d\r\n",res);
+	if(res == 0)
+		print_gprs("GPRS_http:FAIL GPRS_http:FAIL GPRS_http:FAIL GPRS_http:FAILres=%d\r\n\r\n",res);
 	msleep(5000);
 #if 0
 	//GPRS_getIP("http://117.27.89.53:10001/yv/api/vmcCheckin",&ip);

@@ -15,7 +15,7 @@
 #include "..\config.h"
 
 #define	UART3_BPS			115200
-#define	UART3BUFFERLEN		256
+#define	UART3BUFFERLEN		1024
 
 volatile unsigned char Uart3RevBuff[UART3BUFFERLEN];
 volatile unsigned char Uart3RxdHead;
@@ -34,7 +34,6 @@ void InitUart3 (void)
 	PCONP = PCONP | (1<<25);   
     U3LCR  = 0x83;                                                  //允许设置波特率
     ulFdiv = (FPCLK / 16) / UART3_BPS;                              //设置波特率
-    //ulFdiv = (FPCLK / 16) / 115200;                                 //设置波特率
     U3DLM  = ulFdiv / 256;
     U3DLL  = ulFdiv % 256; 
     U3LCR  = 0x03;                                                  //锁定波特率
@@ -105,6 +104,8 @@ void Uart3PutChar(unsigned char ch)
     U3THR = ch;                                                      //写入数据
     while((U3LSR & 0x20) == 0);                                      //等待数据发送完毕
 }
+
+
 
 /*********************************************************************************************************
 ** Function name:	    Uart3PutStr
