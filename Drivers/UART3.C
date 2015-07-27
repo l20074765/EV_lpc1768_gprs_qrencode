@@ -15,11 +15,13 @@
 #include "..\config.h"
 
 #define	UART3_BPS			115200
-#define	UART3BUFFERLEN		1024
 
-volatile unsigned char Uart3RevBuff[UART3BUFFERLEN];
-volatile unsigned char Uart3RxdHead;
-volatile unsigned char Uart3RxdTail;
+
+volatile uint16 uart3_in;   //输入
+volatile uint16 uart3_out;  //进入
+UART3_MSG uart3_data;
+static volatile uint8 startRecv = 0;
+static 	char *uart3_buf = uart3_data.recv;
 
 /*********************************************************************************************************
 ** Function name:     	InitUart3
@@ -39,9 +41,9 @@ void InitUart3 (void)
     U3LCR  = 0x03;                                                  //锁定波特率
     U3FCR  = 0x87;                                                  //使能FIFO，设置8个字节触发点
     U3IER  = 0x01;/*使能接收中断*/                                                  //使能接收中断
-	Uart3RxdHead  = 0;
-	Uart3RxdTail  = 0;
-	memset((void *)Uart3RevBuff,0x00,UART3BUFFERLEN);				//初始化缓冲区
+	uart3_in  = 0;
+	uart3_out  = 0;
+	memset((void *)uart3_buf,0x00,UART3_BUF_SIZE);				//初始化缓冲区
 	zyIsrSet(NVIC_UART3,(unsigned long)Uart3IsrHandler,PRIO_FIVE);	//使能接收中断
 }
 /*********************************************************************************************************
@@ -53,9 +55,8 @@ void InitUart3 (void)
 *********************************************************************************************************/
 void Uart3IsrHandler(void)
 {
-unsigned char Num;
-	unsigned char rxd_head;
-	unsigned char rxd_data;
+	unsigned char Num;
+	unsigned char ch;
 	OSIntEnter();      
     while((U3IIR & 0x01) == 0)                          			//判断是否有中断挂起
 	{
@@ -63,28 +64,20 @@ unsigned char Num;
 		{                                         
             case 0x04 : for (Num = 0; Num < 8; Num++)				//接收数据中断
 						{
-		                	rxd_data = U3RBR;
-							rxd_head = (Uart3RxdHead + 1);
-					        if( rxd_head >= UART3BUFFERLEN ) 
-					           	rxd_head = 0;
-					        if( rxd_head != Uart3RxdTail) 
-					        {
-					           	Uart3RevBuff[Uart3RxdHead] = rxd_data;
-					           	Uart3RxdHead = rxd_head;
-					        }
+							ch = U3RBR;
+							if(startRecv == 1 && uart3_in < UART3_BUF_SIZE){
+								uart3_buf[uart3_in] = ch;
+								uart3_in++;	
+							}
 		                }
 		                break;
             case 0x0C : while((U3LSR & 0x01) == 0x01)				//字符超时中断，判断数据是否接收完毕
 						{                         
-		                	rxd_data = U3RBR;
-							rxd_head = (Uart3RxdHead + 1);
-					        if( rxd_head >= UART3BUFFERLEN ) 
-					           	rxd_head = 0;
-					        if( rxd_head != Uart3RxdTail) 
-					        {
-					           	Uart3RevBuff[Uart3RxdHead] = rxd_data;
-					           	Uart3RxdHead = rxd_head;
-					        }
+		                	ch = U3RBR;
+							if(startRecv == 1 && uart3_in < UART3_BUF_SIZE){
+								uart3_buf[uart3_in] = ch;
+								uart3_in++;
+							}
 		                }
 		                break;
             default	: break;
@@ -133,9 +126,15 @@ void Uart3PutStr(unsigned char const *Str, unsigned int Len)
 *********************************************************************************************************/
 void uart3_clr_buf(void) 
 {
-	Uart3RxdHead = 0;
-	Uart3RxdTail = 0;
+	uart3_in = 0;
+	uart3_out = 0;
+	startRecv = 1;
 }
+
+
+
+
+
 
 /*********************************************************************************************************
 ** Function name:	    Uart3BuffIsNotEmpty
@@ -147,7 +146,7 @@ void uart3_clr_buf(void)
 unsigned char Uart3BuffIsNotEmpty(void)
 {
 	//TracePC("\r\n head=%d,tail=%d",Uart3RxdHead,Uart3RxdTail);
-	if(Uart3RxdHead==Uart3RxdTail) 
+	if(uart3_in == uart3_out) 
 		return 0;
 	else
 		return 1;
@@ -162,11 +161,11 @@ unsigned char Uart3BuffIsNotEmpty(void)
 unsigned char Uart3GetCh(void)
 {
     unsigned char ch;
-    ch = Uart3RevBuff[Uart3RxdTail];
-    Uart3RevBuff[Uart3RxdTail] = 0;
-    Uart3RxdTail++;
-    if(Uart3RxdTail >= UART3BUFFERLEN)
-		Uart3RxdTail = 0;
+    ch = uart3_buf[uart3_out];
+    uart3_buf[uart3_out] = 0;
+    uart3_out++;
+    if(uart3_out >= UART3_BUF_SIZE)
+		uart3_out = 0;
 	return ch;
 }
 /*********************************************************************************************************
@@ -179,21 +178,50 @@ unsigned char Uart3GetCh(void)
 unsigned char Uart3Read(unsigned char *buf, unsigned char len)
 {
     unsigned char count,i;
-	count = Uart3RxdHead - Uart3RxdTail;	
+	count = uart3_in - uart3_out;	
 	if((len == 0) || (count == 0)) 
 	    return 0;
 	else if(len > count) 
 	    len = count;
 	for(i = 0; i < len; i++)	
 	{
-	    *buf++ = Uart3RevBuff[Uart3RxdTail++];
+	    *buf++ = uart3_buf[uart3_out++];
 	}
-	if(Uart3RxdHead == Uart3RxdTail) 
+	if(uart3_in == uart3_out) 
 	{
-		Uart3RxdHead = 0;
-		Uart3RxdTail = 0;
+		uart3_in = 0;
+		uart3_out = 0;
 	}
 	return len;
+}
+
+
+
+
+uint16 uart3_recvBytes(void)
+{
+	return uart3_in;
+}
+
+UART3_MSG *uart3_getPackge(void)
+{
+	uart3_data.rlen = uart3_in;
+	return &uart3_data;
+}
+
+
+void uart3_start(void)
+{
+	uart3_in = 0;
+	uart3_out = 0;
+	memset(uart3_buf,0,UART3_BUF_SIZE);
+	startRecv = 1;
+}
+
+
+void uart3_stop(void)
+{
+   startRecv = 0;
 }
   
 /**************************************End Of File*******************************************************/

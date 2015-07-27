@@ -410,6 +410,11 @@
               <FileType>1</FileType>
               <FilePath>.\API\qrencodeApi.c</FilePath>
             </File>
+            <File>
+              <FileName>gprsApi.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\API\gprsApi.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>

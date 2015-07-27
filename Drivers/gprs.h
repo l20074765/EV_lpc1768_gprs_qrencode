@@ -42,7 +42,8 @@ typedef struct{
 
 uint8 GPRS_sendAT(char *str,...);
 uint8 GPRS_AT_CSQ(void);
-void GPRS_task(void);
+uint8 GPRS_httpPost(const char *data,const char *url);
+
 #endif
 
 
