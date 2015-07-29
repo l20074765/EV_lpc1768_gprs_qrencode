@@ -345,7 +345,7 @@
               <MiscControls></MiscControls>
               <Define></Define>
               <Undefine></Undefine>
-              <IncludePath></IncludePath>
+              <IncludePath>.\ssl</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -655,10 +655,32 @@
               <FileType>1</FileType>
               <FilePath>.\json\cJSON.c</FilePath>
             </File>
+            <File>
+              <FileName>jsonmd5.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\json\jsonmd5.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
-          <GroupName>cstl</GroupName>
+          <GroupName>ssl</GroupName>
+          <Files>
+            <File>
+              <FileName>ssl_tls.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\ssl\ssl_tls.c</FilePath>
+            </File>
+            <File>
+              <FileName>ssl.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\ssl\ssl.c</FilePath>
+            </File>
+            <File>
+              <FileName>md5.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\ssl\md5.c</FilePath>
+            </File>
+          </Files>
         </Group>
       </Groups>
     </Target>

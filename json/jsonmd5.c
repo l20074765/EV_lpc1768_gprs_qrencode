@@ -22,7 +22,7 @@ without express or implied warranty of any kind.
 These notices must be retained in any copies of any part of this
 documentation and/or software.
  */
-#include "md5.h"
+#include "jsonmd5.h"
 #include <string.h>
 #include <stdio.h>
 
@@ -323,29 +323,7 @@ void MDString (char *string,unsigned char digest[16])
 	MD5Final (digest, &context);
 }
 
-#if 0
-/* Digests a file and prints the result.
- */
-int MD5File (char *filename,unsigned char digest[16])
-{
-	FILE *file;
-	MD5_CTX context;
-	int len;
-	unsigned char buffer[1024];
 
-	if ((file = fopen (filename, "rb")) == NULL)
-		return -1;
-	else {
-		MD5Init (&context);
-		while (len = fread (buffer, 1, 1024, file))
-			MD5Update (&context, buffer, len);
-		MD5Final (digest, &context);
-
-		fclose (file);
-	}
-	return 0;
-}
-#endif
 
 void MD5UpdaterString(MD5_CTX *context,const char *string)
 {
@@ -353,21 +331,4 @@ void MD5UpdaterString(MD5_CTX *context,const char *string)
 	MD5Update (context, (unsigned char *)string, len);
 }
 
-#if 0
-int MD5FileUpdateFile (MD5_CTX *context,char *filename)
-{
-	FILE *file;
-	int len;
-	unsigned char buffer[1024];
 
-	if ((file = fopen (filename, "rb")) == NULL)
-		return -1;
-	else {
-		while (len = fread (buffer, 1, 1024, file))
-			MD5Update (context, buffer, len);
-		fclose (file);
-	}
-	return 0;
-}
-
-#endif

@@ -1,4 +1,7 @@
 #include "..\config.h"
+#include "ssl.h"
+
+
 #define GPRS_API_DEBUG
 #ifdef GPRS_API_DEBUG
 #define print_gpi(...)	Trace(__VA_ARGS__)
@@ -6,6 +9,21 @@
 #define print_gpi(...)
 #endif
 
+
+
+void testssl(void)
+{
+	//havege_state hs;
+    //ssl_context ssl;
+    //ssl_session ssn;
+    //ret = ssl_init(&ssl);
+
+//	havege_init( &hs );
+   // memset( &ssn, 0, sizeof( ssl_session ) );
+    //memset( &ssl, 0, sizeof( ssl_context ) );
+
+	ssl_task();
+}
 
 void GPRS_task(void)
 {
@@ -15,8 +33,8 @@ void GPRS_task(void)
 	ip.ch = 1;
 	strcpy(ip.ip,"117.27.89.53");
 	
-
-	ALI_trade(NULL);
+	testssl();
+	//ALI_trade(NULL);
 
 	msleep(5000);
 
